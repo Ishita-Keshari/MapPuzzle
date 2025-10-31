@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧩 Solve the Puzzle</title>
+<style>
+  body {
+    background: radial-gradient(circle at top, #111 0%, #000 100%);
+    color: #f0f0f0;
+    font-family: 'Poppins', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px;
+    overflow: hidden;
+  }
+
+  h1 {
+    color: #af3114;
+    text-shadow: 0 0 15px #af3114;
+    margin-bottom: 25px;
+    font-size: 2rem;
+    letter-spacing: 1px;
+  }
+
+  #game-area {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 50px;
+  }
+
+  #puzzle-grid {
+    width: 500px;
+    height: 500px;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    border: 3px solid #af3114;
+    box-shadow: 0 0 25px rgba(0,255,255,0.4);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.03);
+    position: relative;
+    transition: transform 0.3s ease;
+  }
+
+  #puzzle-grid.win {
+    animation: pulse 1s infinite alternate;
+  }
+
+  @keyframes pulse {
+    from { box-shadow: 0 0 20px #0ff; }
+    to { box-shadow: 0 0 40px #0ff; transform: scale(1.02); }
+  }
+
+  .drop-zone {
+    border: 1px dashed rgba(0,255,255,0.2);
+    width: 80px;
+    height: 80px;
+    transition: background 0.2s ease;
+  }
+
+  .drop-zone:hover {
+    background: rgba(0,255,255,0.05);
+  }
+
+  #pieces-container {
+    position: relative;
+    width: 600px;
+    height: 600px;
+    border: 2px dashed rgba(255,255,255,0.2);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    box-shadow: 0 0 15px rgba(0,255,255,0.1);
+  }
+
+  .piece {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    background-image: url('map.png'); /* Make sure map.png is in same folder */
+    background-size: 480px 480px;
+    cursor: grab;
+    border-radius: 4px;
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+  }
+
+  .piece:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(0,255,255,0.6);
+    z-index: 10;
+  }
+
+  .piece:active {
+    cursor: grabbing;
+    transform: scale(1.08);
+  }
+
+  .buttons {
+    margin-top: 25px;
+    display: flex;
+    gap: 15px;
+  }
+
+  button {
+    padding: 10px 25px;
+    border: none;
+    background: #af3114;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,255,255,0.3);
+    transition: all 0.3s ease;
+  }
+
+  button:hover {
+    background: #fff;
+    color: #00aaaa;
+    box-shadow: 0 0 20px #00ffff;
+  }
+
+  /* Pop-up message */
+  #message {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #111;
+    border: 2px solid #af3114;
+    box-shadow: 0 0 25px #00ffff;
+    padding: 30px 40px;
+    border-radius: 10px;
+    text-align: center;
+    z-index: 999;
+    color: #af3114;
+    font-size: 1.3rem;
+    animation: fadeIn 0.5s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translate(-50%, -45%); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
+  }
+</style>
+</head>
+<body>
+
+<h1>🧩 Solve the Puzzle to Begin the Adventure</h1>
+
+<div id="game-area">
+  <div id="puzzle-grid"></div>
+  <div id="pieces-container"></div>
+</div>
+
+<div class="buttons">
+  <button onclick="shufflePieces()">🔀 Shuffle</button>
+  <button onclick="restartGame()">🔁 Restart</button>
+</div>
+
+<div id="message">🎉 Congratulations! You completed the puzzle!</div>
+
+<script>
+const grid = document.getElementById("puzzle-grid");
+const piecesContainer = document.getElementById("pieces-container");
+const message = document.getElementById("message");
+const size = 6;
+const pieceSize = 80;
+let pieces = [];
+
+// Create drop zones
+for (let i = 0; i < size * size; i++) {
+  const zone = document.createElement("div");
+  zone.classList.add("drop-zone");
+  zone.dataset.index = i;
+  zone.addEventListener("dragover", e => e.preventDefault());
+  zone.addEventListener("drop", dropPiece);
+  grid.appendChild(zone);
+}
+
+// Create puzzle pieces
+for (let row = 0; row < size; row++) {
+  for (let col = 0; col < size; col++) {
+    const index = row * size + col;
+    const piece = document.createElement("div");
+    piece.classList.add("piece");
+    piece.draggable = true;
+    piece.dataset.correct = index;
+    piece.style.backgroundPosition = `${-col * pieceSize}px ${-row * pieceSize}px`;
+    piece.addEventListener("dragstart", dragStart);
+    pieces.push(piece);
+  }
+}
+
+let dragged = null;
+function dragStart(e) {
+  dragged = e.target;
+}
+
+// Allow dropping pieces back outside the grid
+piecesContainer.addEventListener("dragover", e => e.preventDefault());
+piecesContainer.addEventListener("drop", e => {
+  if (dragged) {
+    dragged.style.position = "absolute";
+    dragged.style.left = (e.offsetX - pieceSize / 2) + "px";
+    dragged.style.top = (e.offsetY - pieceSize / 2) + "px";
+    piecesContainer.appendChild(dragged);
+  }
+});
+
+// Drop into grid
+function dropPiece(e) {
+  const zone = e.target.closest(".drop-zone");
+  if (!zone || zone.children.length > 0) return;
+  zone.appendChild(dragged);
+  dragged.style.position = "static";
+  checkWin();
+}
+
+// Shuffle pieces randomly
+function scatterPieces() {
+  pieces.forEach(piece => {
+    piece.style.left = Math.random() * 520 + "px";
+    piece.style.top = Math.random() * 520 + "px";
+    piece.style.position = "absolute";
+    piecesContainer.appendChild(piece);
+  });
+}
+
+function shufflePieces() {
+  grid.querySelectorAll(".drop-zone").forEach(z => z.innerHTML = "");
+  message.style.display = "none";
+  scatterPieces();
+}
+
+function restartGame() {
+  grid.classList.remove("win");
+  message.style.display = "none";
+  scatterPieces();
+}
+
+// Check for win condition
+function checkWin() {
+  const zones = Array.from(grid.querySelectorAll(".drop-zone"));
+  const correct = zones.every((z, i) => {
+    if (z.children.length === 0) return false;
+    return parseInt(z.children[0].dataset.correct) === i;
+  });
+
+  if (correct) {
+    grid.classList.add("win");
+    showMessage();
+  }
+}
+
+// Show congratulations message
+function showMessage() {
+  message.style.display = "block";
+  setTimeout(() => { message.style.display = "none"; }, 5000);
+}
+
+// Initialize
+scatterPieces();
+</script>
+
+</body>
+</html>
